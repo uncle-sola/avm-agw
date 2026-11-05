@@ -3,7 +3,7 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = ">= 3.117, < 5.0"
+      version = ">= 4.62, < 5.0" # 4.62 has http2_enabled and ssl_profile.verify_client_certificate_issuer_dn
     }
     modtm = {
       source  = "Azure/modtm"

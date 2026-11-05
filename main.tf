@@ -25,7 +25,7 @@ resource "azurerm_application_gateway" "this" {
   location                          = var.location
   name                              = var.name
   resource_group_name               = var.resource_group_name
-  enable_http2                      = var.http2_enable
+  http2_enabled                     = var.http2_enable # enable_http2 is deprecated in azurerm 4.x
   fips_enabled                      = var.fips_enabled
   firewall_policy_id                = var.app_gateway_waf_policy_resource_id
   force_firewall_policy_association = true
@@ -345,7 +345,7 @@ resource "azurerm_application_gateway" "this" {
     content {
       name                                 = ssl_profile.value.name
       trusted_client_certificate_names     = ssl_profile.value.trusted_client_certificate_names
-      verify_client_cert_issuer_dn         = ssl_profile.value.verify_client_cert_issuer_dn
+      verify_client_certificate_issuer_dn  = ssl_profile.value.verify_client_cert_issuer_dn # verify_client_cert_issuer_dn is deprecated in azurerm 4.x
       verify_client_certificate_revocation = ssl_profile.value.verify_client_certificate_revocation
 
       dynamic "ssl_policy" {
