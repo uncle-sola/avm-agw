@@ -1,0 +1,29 @@
+name: Tag Release
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'examples/**'
+      - '**.md'
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump to apply
+        type: choice
+        options: [ auto, patch, minor, major ]
+        default: auto
+      dry-run:
+        description: Work out the next version without pushing any tags
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  tag-release:
+    uses: uncle-sola/shared-workflows/.github/workflows/tag-release.yml@main
+    with:
+      bump: ${{ inputs.bump || 'auto' }}
+      dry-run: ${{ inputs.dry-run || false }}
