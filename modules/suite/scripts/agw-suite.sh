@@ -3,6 +3,8 @@
 #
 #   agw-suite.sh upsert   needs AGW_ID, SUITE_NAME, DESIRED_JSON, OWNED_NAME_PREFIX (may be empty)
 #   agw-suite.sh remove   needs AGW_ID, SUITE_NAME, OWNED_NAMES_JSON, OWNED_NAME_PREFIX (may be empty)
+#   agw-suite.sh diff     same inputs as upsert; read-only: says whether the live items match and
+#                         prints the items that differ (exit 0 in sync, 2 out of sync)
 #
 # Called by Terraform (modules/suite), not by hand. Needs az (signed in) and jq.
 #
@@ -43,8 +45,8 @@ COLLECTIONS='["backendAddressPools","backendHttpSettingsCollection","probes","ht
 STRIP_NULLS='walk(if type == "object" then with_entries(select(.value != null)) else . end)'
 
 case "$MODE" in
-  upsert)
-    : "${DESIRED_JSON:?DESIRED_JSON is required for upsert}"
+  upsert|diff)
+    : "${DESIRED_JSON:?DESIRED_JSON is required for $MODE}"
     jq "$STRIP_NULLS" <<<"$DESIRED_JSON" >"$TMP/desired.json"
     jq 'with_entries(.value |= map(.name))' "$TMP/desired.json" >"$TMP/owned.json"
     ;;
@@ -53,7 +55,7 @@ case "$MODE" in
     jq . <<<"$OWNED_NAMES_JSON" >"$TMP/owned.json"
     jq --argjson c "$COLLECTIONS" -n '[$c[] | {key: ., value: []}] | from_entries' >"$TMP/desired.json"
     ;;
-  *) die "unknown mode '$MODE' (expected upsert or remove)" ;;
+  *) die "unknown mode '$MODE' (expected upsert, remove or diff)" ;;
 esac
 
 # jq helpers shared by the in-sync check, the merge and the verification
@@ -133,6 +135,30 @@ wait_succeeded() {
     sleep "$POLL_SECONDS"
   done
 }
+
+show_diff() {
+  jq --slurpfile d "$TMP/desired.json" --slurpfile o "$TMP/owned.json" --arg prefix "$OWNED_NAME_PREFIX" \
+    "$JQ_LIB"'
+    $d[0] as $desired | . as $live |
+    [ $desired | to_entries[] | .key as $c |
+      ([$live.properties[$c][]? | select(owned($c; .name))] | by_name) as $l |
+      (.value | by_name) as $w |
+      ( [($w | keys) - ($l | keys) | .[] | {collection: $c, name: ., change: "add"}]
+      + [($l | keys) - ($w | keys) | .[] | {collection: $c, name: ., change: "remove"}]
+      + [$w | to_entries[] | select($l[.key] != null) | .value as $v | ($l[.key] | proj($v)) as $p
+         | select(($p | lc) != ($v | lc)) | {collection: $c, name: .key, change: "update", live: $p, desired: $v}] )
+    ] | flatten' "$TMP/live.json"
+}
+
+if [[ "$MODE" == "diff" ]]; then
+  get_gateway
+  if in_sync; then
+    log "in sync"
+    exit 0
+  fi
+  show_diff
+  exit 2
+fi
 
 for ((attempt = 1; attempt <= MAX_ATTEMPTS; attempt++)); do
   wait_not_updating
