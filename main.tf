@@ -449,6 +449,22 @@ resource "azurerm_application_gateway" "this" {
       }
     }
   }
+
+  # The routing arrays are only set when the gateway is created. After that they are owned by
+  # modules/suite, which upserts named sets of items (one per platform or business suite) into the
+  # live gateway, so several state files can add routing to one gateway without overwriting each
+  # other. Everything else (SKU, WAF policy, certificates, frontends, ports, identity, autoscale)
+  # stays managed here.
+  lifecycle {
+    ignore_changes = [
+      backend_address_pool,
+      backend_http_settings,
+      probe,
+      http_listener,
+      request_routing_rule,
+      url_path_map,
+    ]
+  }
 }
 
 
