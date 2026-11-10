@@ -173,6 +173,18 @@ for ((attempt = 1; attempt <= MAX_ATTEMPTS; attempt++)); do
   fi
 
   merge
+
+  # A gateway must keep at least one listener, so Azure rejects a PUT that removes the last one
+  # (ApplicationGatewayMustHaveAtleastOneResourceOfType). That only happens when this is the last
+  # suite on the gateway, which in practice means the gateway itself is being destroyed and takes
+  # the items with it. Leave them in place rather than fail the destroy.
+  if [[ "$MODE" == "remove" ]] &&
+    jq -e '((.properties.httpListeners // []) + (.properties.listeners // [])) | length == 0' "$TMP/body.json" >/dev/null; then
+    log "WARNING: this is the last suite on the gateway and a gateway must keep at least one listener;"
+    log "WARNING: leaving its items in place (they go when the gateway is deleted)"
+    exit 0
+  fi
+
   etag="$(jq -r '.etag' "$TMP/live.json")"
   headers="$(jq -nc --arg e "$etag" '{"If-Match": $e, "Content-Type": "application/json"}')"
 

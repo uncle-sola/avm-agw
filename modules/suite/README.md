@@ -23,7 +23,11 @@ overwrites everyone else. The root module of this repo (v1.1.0 and later) sets
      `owned_name_prefix`, then adding the desired ones)
   4. PUTs the gateway with `If-Match: <etag>`, retrying on 412/409
   5. waits for `Succeeded` and checks the result, retrying if another suite overwrote it
-- `terraform_data.registration` removes the suite's items when the suite is destroyed.
+- `terraform_data.registration` removes the suite's items when the suite is destroyed. If it is
+  the last suite on the gateway, removing its items would leave no listeners, which Azure rejects
+  (`ApplicationGatewayMustHaveAtleastOneResourceOfType`). The script then logs a warning and leaves
+  the items in place, so destroying the gateway together with its last suite (e.g. a full
+  `terraform destroy` of eob-agw) succeeds and the items go with the gateway.
 
 Each change is a single in-place PUT: the gateway is never recreated and other suites keep routing.
 
